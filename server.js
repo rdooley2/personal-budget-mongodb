@@ -6,7 +6,13 @@ const fs = require('fs');
 const app = express();
 const port = 3000;
 
+app.use('/', express.static('public'));
+
 app.use(cors());
+
+app.get('/hello', (req, res) => {
+    res.send("Hello World!");
+});
 
 app.get('/budget', (req, res) => {
     // Dynamically read the server.json file on each request
