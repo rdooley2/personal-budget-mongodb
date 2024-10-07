@@ -1,29 +1,49 @@
-// Budget API
-
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs'); 
 const app = express();
 const port = 3000;
+const mongoose = require("mongoose");
+const chartModel = require("./models/chartSchema");
+const url = 'mongodb://localhost:27017/chartDB';
 
+mongoose.connect(url)
+    .then(() => {
+        console.log("Connected to the database");
+    })
+    .catch((err) => {
+        console.error("Error connecting to database", err);
+    });
+
+
+app.use(express.json());
+app.use(cors());
 app.use('/', express.static('public'));
 
-app.use(cors());
 
-app.get('/hello', (req, res) => {
-    res.send("Hello World!");
+app.get('/getChartData', async (req, res) => {
+    try {
+        const data = await chartModel.find({}); 
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error fetching data');
+    }
 });
 
-app.get('/budget', (req, res) => {
-    // Dynamically read the server.json file on each request
-    fs.readFile('./server.json', (err, data) => {
-        if (err) {
-            res.status(500).send('Error reading budget data');
-        } else {
-            const budget = JSON.parse(data); // Parse the JSON data
-            res.json(budget); // Send the parsed data as JSON
-        }
-    });
+app.post('/addChartData', async (req, res) => {
+    try {
+        const { title, value, color } = req.body;
+        const newChart = new chartModel({
+            title: title,
+            value: value,
+            color: color
+        });
+        await newChart.save();
+        res.status(201).json(newChart); 
+    } catch (error) {
+        console.error(error);
+        res.status(400).send('Error adding data');
+    }
 });
 
 app.listen(port, () => {

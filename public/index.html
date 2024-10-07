@@ -135,182 +135,122 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.20.0/axios.min.js" integrity="sha512-quHCp3WbBNkwLfYUMd+KwBAgpVukJu5MncuQaWXgCrfgcxCJAq/fo+oqrRKOj+UKEmyMCG3tb8RB63W+EmrOBg==" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js" integrity="sha512-s+xg36jbIujB2S2VKfpGmlC3T5V2TF3lY48DX7u2r9XzGzgPsa6wTpOQA7J9iffvdeBN0q9tKzRxVxw1JviZPg==" crossorigin="anonymous"></script>
 
-    <script src="https://d3js.org/d3.v3.min.js"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
 
     <script>
-        var dataSource = {
-                datasets: [
-                    {
-                        data: [],
-                        backgroundColor: [
-                            'red',
-                            'orange',
-                            'yellow',
-                            'green',
-                            'blue',
-                            'purple',
-                            'black',
-                        ]
-                    }
-                ],
-                labels: []
-            };
-        function createChart() {
-            var ctx = document.getElementById('myChart').getContext('2d');
-            var myPieChart = new Chart(ctx, {
-                type: 'pie',
-                data: dataSource
-            });
-        }
-        function getBudget() {
-            axios.get('http://localhost:3000/budget')
-            .then(function (res) {
-                for (var i = 0; i < res.data.myBudget.length; i++) {
-                    dataSource.datasets[0].data[i] = res.data.myBudget[i].budget;
-                    dataSource.labels[i] = res.data.myBudget[i].title;
+        fetch('http://localhost:3000/getChartData')
+            .then(response => response.json())
+            .then(data => {
+                const labels = data.map(item => item.title); 
+                const values = data.map(item => item.value); 
+                const colors = data.map(item => item.color); 
 
-                }
-                createChart();
-            });
-        }
-        getBudget();
-    </script>
 
-    <script>
-        // Fetch data from server.json
-        function getD3Data() {
-            axios.get('http://localhost:3000/budget')
-            .then(function (response) {
-                var data = response.data.myBudget.map(item => ({
-                    label: item.title,
-                    value: item.budget
-                }));
-                change(data);
+                const ctx = document.getElementById('myChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: colors, 
+                            borderColor: colors, 
+                            borderWidth: 1,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                    },
+                });
             })
-            .catch(function (error) {
-                console.error('Error fetching data:', error);
-            });
-        }
+            .catch(error => console.error('Error fetching data:', error));
+    </script>
+    <script>
+        fetch('http://localhost:3000/getChartData')
+            .then(response => response.json())
+            .then(data => {
+                const chartData = data.map(item => ({
+                    label: item.title, 
+                    value: item.value,
+                    color: item.color 
+                }));
+    
+       
+                const width = 960,
+                      height = 450,
+                      radius = Math.min(width, height) / 2;
+    
+       
+                const svg = d3.select("#myChart2")
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .append("g")
+                    .attr("transform", `translate(${width / 2}, ${height / 2})`);
+    
+           
+                const pie = d3.pie()
+                    .value(d => d.value)
+                    .sort(null);
+    
+        
+                const arc = d3.arc()
+                    .outerRadius(radius * 0.8)
+                    .innerRadius(radius * 0.4); 
+    
 
-        // Define D3 chart
-        var svg = d3.select("#myChart2")
-            .append("svg")
-            .append("g");
+                const outerArc = d3.arc()
+                    .innerRadius(radius * 0.9)
+                    .outerRadius(radius * 0.9);
+    
 
-        svg.append("g")
-            .attr("class", "slices");
-        svg.append("g")
-            .attr("class", "labels");
-        svg.append("g")
-            .attr("class", "lines");
+                const color = d3.scaleOrdinal()
+                    .domain(chartData.map(d => d.label))
+                    .range(chartData.map(d => d.color));
+    
+      
+                const slices = svg.selectAll("path.slice")
+                    .data(pie(chartData))
+                    .enter()
+                    .append("path")
+                    .attr("class", "slice")
+                    .attr("d", arc)
+                    .style("fill", d => color(d.data.label));
+    
+         
+                const text = svg.selectAll("text")
+                    .data(pie(chartData))
+                    .enter()
+                    .append("text")
+                    .attr("dy", ".35em")
+                    .text(d => d.data.label)
+                    .attr("transform", function(d) {
+                        const pos = outerArc.centroid(d);
+                        pos[0] = radius * (midAngle(d) < Math.PI ? 1.1 : -1.1); 
+                        return `translate(${pos})`;
+                    })
+                    .style("text-anchor", d => midAngle(d) < Math.PI ? "start" : "end");
+    
 
-        var width = 960,
-            height = 450,
-            radius = Math.min(width, height) / 2;
+                svg.selectAll("polyline")
+                    .data(pie(chartData))
+                    .enter()
+                    .append("polyline")
+                    .attr("points", function(d) {
+                        const pos = outerArc.centroid(d);
+                        pos[0] = radius * 0.95 * (midAngle(d) < Math.PI ? 1 : -1);
+                        return [arc.centroid(d), outerArc.centroid(d), pos];
+                    })
+                    .style("stroke", "black")
+                    .style("fill", "none")
+                    .style("stroke-width", 1.5);
+    
 
-        var pie = d3.layout.pie()
-            .sort(null)
-            .value(function(d) { return d.value; });
-
-        var arc = d3.svg.arc()
-            .outerRadius(radius * 0.8)
-            .innerRadius(radius * 0.4);
-
-        var outerArc = d3.svg.arc()
-            .innerRadius(radius * 0.9)
-            .outerRadius(radius * 0.9);
-
-        svg.attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
-
-        var key = function(d) { return d.data.label; };
-
-        var color = d3.scale.ordinal()
-            .domain(["Lorem ipsum", "dolor sit", "amet", "consectetur", "adipisicing", "elit", "sed", "do", "eiusmod", "tempor", "incididunt"])
-            .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
-
-        function change(data) {
-            var slice = svg.select(".slices").selectAll("path.slice")
-                .data(pie(data), key);
-
-            slice.enter()
-                .insert("path")
-                .style("fill", function(d) { return color(d.data.label); })
-                .attr("class", "slice");
-
-            slice.transition().duration(1000)
-                .attrTween("d", function(d) {
-                    this._current = this._current || d;
-                    var interpolate = d3.interpolate(this._current, d);
-                    this._current = interpolate(0);
-                    return function(t) {
-                        return arc(interpolate(t));
-                    };
-                });
-
-            slice.exit().remove();
-
-            var text = svg.select(".labels").selectAll("text")
-                .data(pie(data), key);
-
-            text.enter()
-                .append("text")
-                .attr("dy", ".35em")
-                .text(function(d) {
-                    return d.data.label;
-                });
-
-            function midAngle(d) {
-                return d.startAngle + (d.endAngle - d.startAngle) / 2;
-            }
-
-            text.transition().duration(1000)
-                .attrTween("transform", function(d) {
-                    this._current = this._current || d;
-                    var interpolate = d3.interpolate(this._current, d);
-                    this._current = interpolate(0);
-                    return function(t) {
-                        var d2 = interpolate(t);
-                        var pos = outerArc.centroid(d2);
-                        pos[0] = radius * (midAngle(d2) < Math.PI ? 1 : -1);
-                        return "translate(" + pos + ")";
-                    };
-                })
-                .styleTween("text-anchor", function(d) {
-                    this._current = this._current || d;
-                    var interpolate = d3.interpolate(this._current, d);
-                    this._current = interpolate(0);
-                    return function(t) {
-                        var d2 = interpolate(t);
-                        return midAngle(d2) < Math.PI ? "start" : "end";
-                    };
-                });
-
-            text.exit().remove();
-
-            var polyline = svg.select(".lines").selectAll("polyline")
-                .data(pie(data), key);
-
-            polyline.enter()
-                .append("polyline");
-
-            polyline.transition().duration(1000)
-                .attrTween("points", function(d) {
-                    this._current = this._current || d;
-                    var interpolate = d3.interpolate(this._current, d);
-                    this._current = interpolate(0);
-                    return function(t) {
-                        var d2 = interpolate(t);
-                        var pos = outerArc.centroid(d2);
-                        pos[0] = radius * 0.95 * (midAngle(d2) < Math.PI ? 1 : -1);
-                        return [arc.centroid(d2), outerArc.centroid(d2), pos];
-                    };
-                });
-
-            polyline.exit().remove();
-        }
-
-        // Initialize chart with data from server.json
-        getD3Data();
+                function midAngle(d) {
+                    return d.startAngle + (d.endAngle - d.startAngle) / 2;
+                }
+            })
+            .catch(error => console.error('Error fetching data:', error));
     </script>
 
 </body>
